@@ -78,6 +78,15 @@ pub fn convert_file(
     report("Decoding place file, this is the longest part...");
     let tree = decode_file(input_path)?;
 
+    convert_tree(&tree, input_path, output_root, report)
+}
+
+pub fn convert_tree(
+    tree: &WeakDom,
+    input_path: &Path,
+    output_root: &Path,
+    mut report: impl FnMut(&'static str),
+) -> Result<PathBuf, ConvertError> {
     let project_path = output_project_path(input_path, output_root);
     fs::create_dir_all(&project_path)
         .map_err(|error| ConvertError::Io("create the project folder", error))?;
@@ -85,6 +94,9 @@ pub fn convert_file(
 
     report("Starting processing, please wait a bit...");
     process_instructions(&tree, &mut filesystem);
+    if let Some((doing_what, error)) = filesystem.into_error() {
+        return Err(ConvertError::Io(doing_what, error));
+    }
     report("Done");
 
     Ok(project_path)

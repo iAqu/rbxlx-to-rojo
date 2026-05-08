@@ -202,3 +202,30 @@ fn conversion_output_folder_uses_input_file_stem() {
 
     std::fs::remove_dir_all(&output_root).unwrap();
 }
+
+#[test]
+fn convert_file_returns_error_when_output_src_is_a_file() {
+    let source = std::path::Path::new("test-files/folder-with-value/source.rbxmx");
+    let output_root = std::env::temp_dir().join(format!(
+        "rbxlx-to-rojo-converter-output-error-test-{}",
+        std::process::id()
+    ));
+    let project_path = output_root.join("source");
+
+    if output_root.exists() {
+        std::fs::remove_dir_all(&output_root).unwrap();
+    }
+    std::fs::create_dir_all(&project_path).unwrap();
+    std::fs::write(project_path.join("src"), "not a directory").unwrap();
+
+    let error = crate::converter::convert_file(source, &output_root, |_| {}).unwrap_err();
+
+    assert!(matches!(error, crate::converter::ConvertError::Io(_, _)));
+    assert!(
+        error.to_string().contains("create the source folder"),
+        "{}",
+        error
+    );
+
+    std::fs::remove_dir_all(&output_root).unwrap();
+}

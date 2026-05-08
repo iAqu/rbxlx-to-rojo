@@ -3,7 +3,7 @@ use serde::{ser::SerializeMap, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
     fs::{self, File},
-    io::Write,
+    io::{self, Write},
     path::PathBuf,
 };
 
@@ -37,11 +37,12 @@ impl Project {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct FileSystem {
     project: Project,
     root: PathBuf,
     source: PathBuf,
+    error: Option<(&'static str, io::Error)>,
 }
 
 impl FileSystem {
@@ -49,18 +50,37 @@ impl FileSystem {
         let source = root.join(SRC);
         let project = Project::new();
 
-        fs::create_dir(&source).ok(); // It'll error later if it matters
+        let error = match fs::create_dir(&source) {
+            Ok(()) => None,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists && source.is_dir() => None,
+            Err(error) => Some(("create the source folder", error)),
+        };
 
         Self {
             project,
             root,
             source,
+            error,
+        }
+    }
+
+    pub fn into_error(self) -> Option<(&'static str, io::Error)> {
+        self.error
+    }
+
+    fn record_error(&mut self, doing_what: &'static str, error: io::Error) {
+        if self.error.is_none() {
+            self.error = Some((doing_what, error));
         }
     }
 }
 
 impl InstructionReader for FileSystem {
     fn read_instruction<'a>(&mut self, instruction: Instruction<'a>) {
+        if self.error.is_some() {
+            return;
+        }
+
         match instruction {
             Instruction::AddToTree {
                 name,
@@ -86,30 +106,47 @@ impl InstructionReader for FileSystem {
             }
 
             Instruction::CreateFile { filename, contents } => {
-                let mut file = File::create(self.source.join(&filename)).unwrap_or_else(|error| {
-                    panic!("can't create file {:?}: {:?}", filename, error)
-                });
-                file.write_all(&contents).unwrap_or_else(|error| {
-                    panic!("can't write to file {:?} due to {:?}", filename, error)
-                });
+                match File::create(self.source.join(&filename)) {
+                    Ok(mut file) => {
+                        if let Err(error) = file.write_all(&contents) {
+                            self.record_error("write an output file", error);
+                        }
+                    }
+                    Err(error) => self.record_error("create an output file", error),
+                }
             }
 
             Instruction::CreateFolder { folder } => {
-                fs::create_dir_all(self.source.join(&folder)).unwrap_or_else(|error| {
-                    panic!("can't write to folder {:?}: {:?}", folder, error)
-                });
+                if let Err(error) = fs::create_dir_all(self.source.join(&folder)) {
+                    self.record_error("create an output folder", error);
+                }
             }
         }
     }
 
     fn finish_instructions(&mut self) {
-        let mut file = File::create(self.root.join("default.project.json"))
-            .expect("can't create default.project.json");
-        file.write_all(
-            &serde_json::to_string_pretty(&self.project)
-                .expect("couldn't serialize project")
-                .as_bytes(),
-        )
-        .expect("can't write project");
+        if self.error.is_some() {
+            return;
+        }
+
+        let project = match serde_json::to_string_pretty(&self.project) {
+            Ok(project) => project,
+            Err(error) => {
+                self.record_error(
+                    "serialize the project file",
+                    io::Error::new(io::ErrorKind::Other, error),
+                );
+                return;
+            }
+        };
+
+        match File::create(self.root.join("default.project.json")) {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(project.as_bytes()) {
+                    self.record_error("write the project file", error);
+                }
+            }
+            Err(error) => self.record_error("create the project file", error),
+        }
     }
 }

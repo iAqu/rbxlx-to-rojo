@@ -1,5 +1,5 @@
 use log::info;
-use rbxlx_to_rojo::converter::{convert_file, ConvertError};
+use rbxlx_to_rojo::converter::{convert_tree, decode_file, ConvertError};
 use std::{
     fmt, fs,
     io::{self, Write},
@@ -94,6 +94,10 @@ fn routine() -> Result<(), Problem> {
         },
     });
 
+    info!("Opening place file");
+    info!("Decoding place file, this is the longest part...");
+    let tree = decode_file(&file_path)?;
+
     info!("Select the path to put your Rojo project in.");
     let root = PathBuf::from(match std::env::args().nth(2) {
         Some(text) => text,
@@ -111,7 +115,7 @@ fn routine() -> Result<(), Problem> {
             .map_err(|error| Problem::IoError("couldn't create log file", error))?,
     );
 
-    convert_file(&file_path, &root, |message| info!("{}", message))?;
+    convert_tree(&tree, &file_path, &root, |message| info!("{}", message))?;
     Ok(())
 }
 
