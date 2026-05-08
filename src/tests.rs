@@ -82,8 +82,14 @@ impl InstructionReader for VirtualFileSystem {
                             let tree = rbx_xml::from_str_default(&contents_string)
                                 .expect("couldn't decode encoded xml");
                             let child_id = tree.root().children()[0];
-                            let child_instance = tree.get_by_ref(child_id).unwrap().clone();
-                            VirtualFileContents::Instance(child_instance.properties.to_owned())
+                            let child_instance = tree.get_by_ref(child_id).unwrap();
+                            VirtualFileContents::Instance(
+                                child_instance
+                                    .properties
+                                    .iter()
+                                    .map(|(key, value)| (key.to_string(), value.clone()))
+                                    .collect(),
+                            )
                         } else {
                             VirtualFileContents::Bytes(contents_string)
                         },
@@ -106,7 +112,7 @@ impl InstructionReader for VirtualFileSystem {
 
 #[test]
 fn run_tests() {
-    let _ = env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
     for entry in fs::read_dir("./test-files").expect("couldn't read test-files") {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -160,4 +166,39 @@ fn run_tests() {
         let mut filesystem = FileSystem::from_root(filesystem_path);
         process_instructions(&tree, &mut filesystem);
     }
+}
+
+#[test]
+fn convert_file_rejects_unknown_extension() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let input = std::path::Path::new("test-files/baseplate/source.txt");
+    let output = std::path::Path::new("/private/tmp/rbxlx-to-rojo-test-output");
+
+    let error = crate::converter::convert_file(input, output, |_| {}).unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "The file provided does not have a recognized file extension"
+    );
+}
+
+#[test]
+fn conversion_output_folder_uses_input_file_stem() {
+    let source = std::path::Path::new("test-files/folder-with-value/source.rbxmx");
+    let output_root = std::env::temp_dir().join(format!(
+        "rbxlx-to-rojo-converter-test-{}",
+        std::process::id()
+    ));
+
+    if output_root.exists() {
+        std::fs::remove_dir_all(&output_root).unwrap();
+    }
+    std::fs::create_dir_all(&output_root).unwrap();
+
+    let result = crate::converter::convert_file(source, &output_root, |_| {}).unwrap();
+
+    assert_eq!(result, output_root.join("source"));
+    assert!(result.join("default.project.json").exists());
+
+    std::fs::remove_dir_all(&output_root).unwrap();
 }

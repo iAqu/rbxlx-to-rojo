@@ -1,0 +1,38 @@
+{
+  "files": {
+    "Workspace": {
+      "contents": {
+        "Vfs": {
+          "files": {},
+          "tree": {}
+        }
+      }
+    },
+    "Workspace/Part": {
+      "contents": {
+        "Vfs": {
+          "files": {
+            "Script.server.lua": {
+              "contents": {
+                "Bytes": "print(\"ok\")"
+              }
+            },
+            "init.meta.json": {
+              "contents": {
+                "Bytes": "{\n  \"className\": \"Part\",\n  \"ignoreUnknownInstances\": true\n}"
+              }
+            }
+          },
+          "tree": {}
+        }
+      }
+    }
+  },
+  "tree": {
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true,
+      "$path": "Workspace"
+    }
+  }
+}

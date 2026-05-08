@@ -1,35 +1,24 @@
 use log::info;
-use rbxlx_to_rojo::{filesystem::FileSystem, process_instructions};
+use rbxlx_to_rojo::converter::{convert_file, ConvertError};
 use std::{
-    borrow::Cow,
     fmt, fs,
-    io::{self, BufReader, Write},
+    io::{self, Write},
     path::PathBuf,
     sync::{Arc, RwLock},
 };
 
 #[derive(Debug)]
 enum Problem {
-    BinaryDecodeError(rbx_binary::DecodeError),
-    InvalidFile,
+    Convert(ConvertError),
     IoError(&'static str, io::Error),
     NFDCancel,
     NFDError(String),
-    XMLDecodeError(rbx_xml::DecodeError),
 }
 
 impl fmt::Display for Problem {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Problem::BinaryDecodeError(error) => write!(
-                formatter,
-                "While attempting to decode the place file, at {} rbx_binary didn't know what to do",
-                error,
-            ),
-
-            Problem::InvalidFile => {
-                write!(formatter, "The file provided does not have a recognized file extension")
-            }
+            Problem::Convert(error) => write!(formatter, "{}", error),
 
             Problem::IoError(doing_what, error) => {
                 write!(formatter, "While attempting to {}, {}", doing_what, error)
@@ -42,13 +31,13 @@ impl fmt::Display for Problem {
                 "Something went wrong when choosing a file: {}",
                 error,
             ),
-
-            Problem::XMLDecodeError(error) => write!(
-                formatter,
-                "While attempting to decode the place file, at {} rbx_xml didn't know what to do",
-                error,
-            ),
         }
+    }
+}
+
+impl From<ConvertError> for Problem {
+    fn from(error: ConvertError) -> Self {
+        Problem::Convert(error)
     }
 }
 
@@ -105,26 +94,6 @@ fn routine() -> Result<(), Problem> {
         },
     });
 
-    info!("Opening place file");
-    let file_source = BufReader::new(
-        fs::File::open(&file_path)
-            .map_err(|error| Problem::IoError("read the place file", error))?,
-    );
-    info!("Decoding place file, this is the longest part...");
-
-    let tree = match file_path
-        .extension()
-        .map(|extension| extension.to_string_lossy())
-    {
-        Some(Cow::Borrowed("rbxmx")) | Some(Cow::Borrowed("rbxlx")) => {
-            rbx_xml::from_reader_default(file_source).map_err(Problem::XMLDecodeError)
-        }
-        Some(Cow::Borrowed("rbxm")) | Some(Cow::Borrowed("rbxl")) => {
-            rbx_binary::from_reader_default(file_source).map_err(Problem::BinaryDecodeError)
-        }
-        _ => Err(Problem::InvalidFile),
-    }?;
-
     info!("Select the path to put your Rojo project in.");
     let root = PathBuf::from(match std::env::args().nth(2) {
         Some(text) => text,
@@ -137,16 +106,12 @@ fn routine() -> Result<(), Problem> {
         },
     });
 
-    let mut filesystem = FileSystem::from_root(root.join(file_path.file_stem().unwrap()).into());
-
     log_file.write().unwrap().replace(
         fs::File::create(root.join("rbxlx-to-rojo.log"))
             .map_err(|error| Problem::IoError("couldn't create log file", error))?,
     );
 
-    info!("Starting processing, please wait a bit...");
-    process_instructions(&tree, &mut filesystem);
-    info!("Done! Check rbxlx-to-rojo.log for a full log.");
+    convert_file(&file_path, &root, |message| info!("{}", message))?;
     Ok(())
 }
 
