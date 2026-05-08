@@ -13,7 +13,13 @@ name = "rbxlx-to-rojo"
 path = "src/cli.rs"
 required-features = ["cli"]
 
+[[bin]]
+name = "rbxlx-to-rojo-gui"
+path = "src/mac_app.rs"
+required-features = ["gui"]
+
 [dependencies]
+eframe = { version = "0.31", optional = true }
 env_logger = "0.6"
 lazy_static = "1.4"
 log = "0.4"
@@ -22,6 +28,7 @@ rbx_dom_weak = "4.1.0"
 rbx_reflection = "6.1.0"
 rbx_reflection_database = "2.0.2"
 rbx_xml = "2.0.1"
+rfd = { version = "0.15", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
@@ -33,3 +40,4 @@ pretty_assertions = "0.6"
 
 [features]
 cli = ["nfd"]
+gui = ["eframe", "rfd"]

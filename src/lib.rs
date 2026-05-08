@@ -16,6 +16,9 @@ pub mod converter;
 pub mod filesystem;
 pub mod structures;
 
+#[cfg(feature = "gui")]
+pub mod gui;
+
 #[cfg(test)]
 mod tests;
 
