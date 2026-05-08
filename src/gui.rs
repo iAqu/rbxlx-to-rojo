@@ -230,6 +230,14 @@ impl eframe::App for ConverterApp {
                 ui.label(format!("Status: {}", self.status));
             });
 
+            if let Some(path) = &self.result_path {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label("Generated project");
+                    ui.monospace(path.display().to_string());
+                });
+            }
+
             ui.add_space(8.0);
             ui.label("Drop a Roblox place or model file anywhere in this window.");
             ui.separator();
