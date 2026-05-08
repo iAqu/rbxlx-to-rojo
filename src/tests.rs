@@ -204,6 +204,30 @@ fn conversion_output_folder_uses_input_file_stem() {
 }
 
 #[test]
+fn convert_file_accepts_uppercase_extension() {
+    let source = std::path::Path::new("test-files/folder-with-value/source.rbxmx");
+    let temp_root = std::env::temp_dir().join(format!(
+        "rbxlx-to-rojo-uppercase-test-{}",
+        std::process::id()
+    ));
+    let input_path = temp_root.join("SOURCE.RBXMX");
+    let output_root = temp_root.join("output");
+
+    if temp_root.exists() {
+        std::fs::remove_dir_all(&temp_root).unwrap();
+    }
+    std::fs::create_dir_all(&output_root).unwrap();
+    std::fs::copy(source, &input_path).unwrap();
+
+    let result = crate::converter::convert_file(&input_path, &output_root, |_| {}).unwrap();
+
+    assert_eq!(result, output_root.join("SOURCE"));
+    assert!(result.join("default.project.json").exists());
+
+    std::fs::remove_dir_all(&temp_root).unwrap();
+}
+
+#[test]
 fn convert_file_returns_error_when_output_src_is_a_file() {
     let source = std::path::Path::new("test-files/folder-with-value/source.rbxmx");
     let output_root = std::env::temp_dir().join(format!(

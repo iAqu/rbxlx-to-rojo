@@ -44,11 +44,19 @@ impl fmt::Display for ConvertError {
 impl std::error::Error for ConvertError {}
 
 pub fn decode_file(path: &Path) -> Result<WeakDom, ConvertError> {
-    let is_xml = match path.extension().and_then(|extension| extension.to_str()) {
-        Some("rbxmx") | Some("rbxlx") => true,
-        Some("rbxm") | Some("rbxl") => false,
-        _ => return Err(ConvertError::InvalidFile),
-    };
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .ok_or(ConvertError::InvalidFile)?;
+
+    let is_xml =
+        if extension.eq_ignore_ascii_case("rbxmx") || extension.eq_ignore_ascii_case("rbxlx") {
+            true
+        } else if extension.eq_ignore_ascii_case("rbxm") || extension.eq_ignore_ascii_case("rbxl") {
+            false
+        } else {
+            return Err(ConvertError::InvalidFile);
+        };
 
     let file_source = BufReader::new(
         fs::File::open(path).map_err(|error| ConvertError::Io("read the place file", error))?,
