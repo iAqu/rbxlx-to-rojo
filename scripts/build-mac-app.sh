@@ -7,7 +7,7 @@ APP_DIR="$ROOT/dist/$APP_NAME.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
 
-cargo build --release --features gui --bin rbxlx-to-rojo-gui
+cargo build --manifest-path "$ROOT/Cargo.toml" --release --features gui --bin rbxlx-to-rojo-gui
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
