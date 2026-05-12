@@ -58,13 +58,17 @@ pub fn decode_file(path: &Path) -> Result<WeakDom, ConvertError> {
             return Err(ConvertError::InvalidFile);
         };
 
-    let file_source = BufReader::new(
-        fs::File::open(path).map_err(|error| ConvertError::Io("read the place file", error))?,
-    );
-
     if is_xml {
-        rbx_xml::from_reader_default(file_source).map_err(ConvertError::XmlDecode)
+        let file_bytes =
+            fs::read(path).map_err(|error| ConvertError::Io("read the place file", error))?;
+        let file_source = String::from_utf8_lossy(&file_bytes);
+
+        rbx_xml::from_str_default(&file_source).map_err(ConvertError::XmlDecode)
     } else {
+        let file_source = BufReader::new(
+            fs::File::open(path).map_err(|error| ConvertError::Io("read the place file", error))?,
+        );
+
         rbx_binary::from_reader(file_source).map_err(ConvertError::BinaryDecode)
     }
 }

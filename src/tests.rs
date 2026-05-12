@@ -228,6 +228,48 @@ fn convert_file_accepts_uppercase_extension() {
 }
 
 #[test]
+fn decode_xml_file_tolerates_invalid_utf8_in_string_cdata() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "rbxlx-to-rojo-invalid-utf8-test-{}",
+        std::process::id()
+    ));
+    let input_path = temp_root.join("invalid-name.rbxmx");
+
+    if temp_root.exists() {
+        std::fs::remove_dir_all(&temp_root).unwrap();
+    }
+    std::fs::create_dir_all(&temp_root).unwrap();
+
+    let mut source = Vec::new();
+    source.extend_from_slice(
+        br#"<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+	<Meta name="ExplicitAutoJoints">true</Meta>
+	<External>null</External>
+	<External>nil</External>
+	<Item class="Folder" referent="RBX1">
+		<Properties>
+			<string name="Name"><![CDATA[bad"#,
+    );
+    source.push(0xff);
+    source.extend_from_slice(
+        br#"name]]></string>
+			<BinaryString name="Tags"></BinaryString>
+		</Properties>
+	</Item>
+</roblox>"#,
+    );
+    std::fs::write(&input_path, source).unwrap();
+
+    let tree = crate::converter::decode_file(&input_path).unwrap();
+    let child_id = tree.root().children()[0];
+    let child = tree.get_by_ref(child_id).unwrap();
+
+    assert_eq!(child.name, "bad\u{fffd}name");
+
+    std::fs::remove_dir_all(&temp_root).unwrap();
+}
+
+#[test]
 fn convert_file_returns_error_when_output_src_is_a_file() {
     let source = std::path::Path::new("test-files/folder-with-value/source.rbxmx");
     let output_root = std::env::temp_dir().join(format!(
